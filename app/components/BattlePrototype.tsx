@@ -105,7 +105,7 @@ function ZoneBoard({ attack, blocks, onAttack, onToggleBlock, hitZone, blockedZo
     </div>
   );
 }
-function labelY(z:Zone){ return ({Head:18, Chest:52, Torso:76, Knees:104, Feet:130} as any)[z]; }
+function labelY(z:Zone){ return ({Head:18, Chest:52, Torso:76, Knees:104, Feet:130} as Record<Zone, number>)[z]; }
 
 type Fx = { id:number; kind:"dmg"|"slash"|"parry"; xPct:number; yPct:number; text?:string; ttl:number };
 function EffectsLayer({fx}:{fx:Fx[]}){
@@ -150,7 +150,7 @@ export default function BattlePrototype() {
   const [lastBlockedZone, setLastBlockedZone] = useState<Zone|null>(null);
   const [lastBotHitZone, setLastBotHitZone] = useState<Zone|null>(null);
   const [lastBotBlockedZone, setLastBotBlockedZone] = useState<Zone|null>(null);
-  const noop = () => {};
+  // Removed unused noop function
   const [showBotBlocks, setShowBotBlocks] = useState(false);
   function spawnFx(f: Omit<Fx,"id">){ const id = fxId.current++; setFx(s=>[...s,{...f,id}]); setTimeout(()=> setFx(s=>s.filter(x=>x.id!==id)), f.ttl); }
 
@@ -159,12 +159,11 @@ export default function BattlePrototype() {
   function ensureAudio(){
     try{
       if(!audioRef.current){
-        // @ts-ignore
-        const C = (window as any).AudioContext || (window as any).webkitAudioContext;
+        // @ts-expect-error - AudioContext types may vary by browser
+        const C = ((window as Record<string, unknown>).AudioContext || (window as Record<string, unknown>).webkitAudioContext) as typeof AudioContext;
         audioRef.current = new C();
       }
       // Resume if suspended (autoplay policy)
-      // @ts-ignore
       if(audioRef.current?.state === 'suspended') audioRef.current.resume();
     }catch{ /* ignore */ }
     return audioRef.current;

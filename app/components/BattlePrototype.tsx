@@ -83,7 +83,7 @@ function ZoneBoard({ attack, blocks, onAttack, onToggleBlock, hitZone, blockedZo
   };
   return (
     <div className="relative flex items-center justify-center">
-      <svg viewBox="0 0 100 140" className="w-full max-w-xs mx-auto select-none">
+      <svg viewBox="0 0 100 140" className="w-full max-w-[120px] sm:max-w-xs mx-auto select-none">
         {zones.map(z => (
           <g key={z} onClick={()=>handle(z)}>
             <path d={Z[z]}
@@ -96,7 +96,7 @@ function ZoneBoard({ attack, blocks, onAttack, onToggleBlock, hitZone, blockedZo
               strokeWidth={1.5}
             />
             {isBlock(z) && (
-              <text x="50" y={labelY(z)} textAnchor="middle" className="fill-sky-300 text-[10px]">🛡</text>
+              <text x="50" y={labelY(z)} textAnchor="middle" className="fill-sky-300 text-[8px] sm:text-[10px]">🛡</text>
             )}
             <title>{z}</title>
           </g>
@@ -315,12 +315,12 @@ export default function BattlePrototype() {
   const hpBarBot = useMemo(() => hpBarPercent(bot.hp, bot.hpMax), [bot.hp, bot.hpMax]);
 
   return (
-    <div className="min-h-screen w-full bg-neutral-950 text-neutral-100 p-6">
+    <div className="min-h-screen w-full bg-neutral-950 text-neutral-100 p-3 sm:p-6">
       <style>{FX_CSS}</style>
-      <div className="max-w-4xl mx-auto grid gap-4">
-        <header className="flex items-center justify-between gap-2">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">FOUR QUARTERS · Battleground</h1>
-          <div className="flex items-center gap-2 text-sm">
+      <div className="max-w-4xl mx-auto grid gap-3 sm:gap-4">
+        <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">FOUR QUARTERS · Battleground</h1>
+          <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
             <LevelPicker label="You" value={p1.level} onChange={(lvl) => makeNew(lvl, bot.level)} />
             <LevelPicker label="Bot" value={bot.level} onChange={(lvl) => makeNew(p1.level, lvl)} />
             <button className="ml-2 rounded-2xl px-3 py-1 bg-neutral-800 hover:bg-neutral-700" onClick={() => makeNew(p1.level, bot.level)}>Restart</button>
@@ -328,17 +328,17 @@ export default function BattlePrototype() {
         </header>
 
         {/* Fighters */}
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-4">
           <FighterCard title="You" hp={p1.hp} hpMax={p1.hpMax} hpBar={hpBarP1} lastAttack={p1.lastAttack} lastBlocks={p1.lastBlocks} />
           <FighterCard title="Bot" hp={bot.hp} hpMax={bot.hpMax} hpBar={hpBarBot} lastAttack={bot.lastAttack} lastBlocks={bot.lastBlocks} right />
         </div>
 
         {/* Controls */}
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid gap-4">
           {!isOver && (
-          <div id="controlsCard" className="md:col-span-3 rounded-3xl bg-neutral-900 border border-neutral-800 p-4 relative overflow-hidden">
+          <div id="controlsCard" className="rounded-3xl bg-neutral-900 border border-neutral-800 p-3 sm:p-4 relative overflow-hidden">
             <h2 className="text-lg font-semibold mb-3">Your turn · Round {round}</h2>
-            <div className="grid sm:grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-4">
               <div className="relative">
                 <div className="text-xs text-neutral-400 mb-1">You</div>
                 <ZoneBoard attack={null} blocks={choicesP1.blocks}
@@ -358,11 +358,11 @@ export default function BattlePrototype() {
             </div>
             <div className="text-xs text-neutral-400 mt-2">Tip: Click the <span className="text-neutral-200">opponent</span> to choose your <span className="text-neutral-200">attack</span>, and click your <span className="text-neutral-200">body</span> to toggle up to two <span className="text-neutral-200">blocks</span>.</div>
             {/* Buttons (redundant controls) */}
-            <div className="grid sm:grid-cols-2 gap-6 mt-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mt-3">
               {/* LEFT: Block (pick 2) */}
               <div>
                 <h3 className="text-sm uppercase tracking-wider text-neutral-400 mb-2">Block (pick 2)</h3>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1 sm:gap-2">
                   {ZONES.map((z) => {
                     const selected = choicesP1.blocks.includes(z);
                     const disabled = !selected && choicesP1.blocks.length >= 2;
@@ -372,7 +372,7 @@ export default function BattlePrototype() {
                         onClick={() => toggleBlock(z, choicesP1, setChoicesP1)}
                         disabled={disabled}
                         className={
-                          "px-3 py-2 rounded-2xl border " +
+                          "px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl border text-xs sm:text-sm " +
                           (selected
                             ? "bg-sky-600 border-sky-500"
                             : disabled
@@ -387,13 +387,13 @@ export default function BattlePrototype() {
               {/* RIGHT: Attack */}
               <div>
                 <h3 className="text-sm uppercase tracking-wider text-neutral-400 mb-2">Attack</h3>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1 sm:gap-2">
                   {ZONES.map((z) => (
                     <button
                       key={z}
                       onClick={() => setChoicesP1((c) => ({ ...c, attack: c.attack === z ? null : z }))}
                       className={
-                        "px-3 py-2 rounded-2xl border " +
+                        "px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl border text-xs sm:text-sm " +
                         (choicesP1.attack === z
                           ? "bg-emerald-600 border-emerald-500"
                           : "bg-neutral-800 border-neutral-700 hover:bg-neutral-700")
@@ -403,11 +403,11 @@ export default function BattlePrototype() {
                 </div>
               </div>
             </div>
-            <div className="mt-4 flex items-center gap-2">
+            <div className="mt-4 flex flex-col sm:flex-row items-center gap-2">
               <button
                 onClick={resolveTurn}
                 disabled={isOver}
-                className="rounded-2xl px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60"
+                className="w-full sm:w-auto rounded-2xl px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60"
               >Make your move 👊</button>
               <button
                 onClick={() => {
@@ -418,7 +418,7 @@ export default function BattlePrototype() {
                 setBot(prev=>({...prev, lastBlocks: []}));
               }}
                 disabled={isOver}
-                className="rounded-2xl px-3 py-2 bg-neutral-800 hover:bg-neutral-700"
+                className="w-full sm:w-auto rounded-2xl px-3 py-2 bg-neutral-800 hover:bg-neutral-700"
               >Reset</button>
             </div>
           </div>
@@ -426,9 +426,9 @@ export default function BattlePrototype() {
           )}
 
           {isOver && (
-            <div className="md:col-span-3 rounded-3xl bg-neutral-900 border border-neutral-800 p-6 text-center">
-              <h2 className="text-2xl font-bold mb-2">Battle complete</h2>
-              <p className="text-lg"><span className="font-semibold">{finalOutcome}</span> — you obtained {finalRewards?.you ?? 0} HP and bot obtained {finalRewards?.bot ?? 0} HP</p>
+            <div className="rounded-3xl bg-neutral-900 border border-neutral-800 p-4 sm:p-6 text-center">
+              <h2 className="text-xl sm:text-2xl font-bold mb-2">Battle complete</h2>
+              <p className="text-base sm:text-lg"><span className="font-semibold">{finalOutcome}</span> — you obtained {finalRewards?.you ?? 0} HP and bot obtained {finalRewards?.bot ?? 0} HP</p>
               <div className="mt-4">
                 <button onClick={() => makeNew(p1.level, bot.level)} className="rounded-2xl px-4 py-2 bg-emerald-600 hover:bg-emerald-500">Play again</button>
               </div>
@@ -436,9 +436,9 @@ export default function BattlePrototype() {
           )}
 
           {/* Log */}
-          <div className="md:col-span-3 rounded-3xl bg-neutral-900 border border-neutral-800 p-4 max-h-80 overflow-auto">
+          <div className="rounded-3xl bg-neutral-900 border border-neutral-800 p-3 sm:p-4 max-h-80 overflow-auto">
             <h2 className="text-lg font-semibold mb-3">Combat log</h2>
-            <ul className="space-y-2 text-sm">
+            <ul className="space-y-2 text-xs sm:text-sm">
               {log.map((line, idx) => (
                 <li key={idx} className="font-mono leading-relaxed whitespace-pre-wrap">{line}</li>
               ))}
@@ -474,15 +474,15 @@ function hpBarPercent(hp: number, hpMax: number) {
 
 function FighterCard({ title, hp, hpMax, hpBar, lastAttack, lastBlocks, right }: { title: string; hp: number; hpMax: number; hpBar: number; lastAttack?: Zone; lastBlocks?: Zone[]; right?: boolean }) {
   return (
-    <div className={`rounded-3xl bg-neutral-900 border border-neutral-800 p-4 ${right ? "md:text-right" : ""}`}>
+    <div className={`rounded-3xl bg-neutral-900 border border-neutral-800 p-3 sm:p-4 ${right ? "md:text-right" : ""}`}>
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-lg font-semibold">{title}</h2>
-        <span className="text-sm text-neutral-400">HP {hp}/{hpMax}</span>
+        <h2 className="text-base sm:text-lg font-semibold">{title}</h2>
+        <span className="text-xs sm:text-sm text-neutral-400">HP {hp}/{hpMax}</span>
       </div>
-      <div className="h-3 bg-neutral-800 rounded-xl overflow-hidden">
+      <div className="h-2 sm:h-3 bg-neutral-800 rounded-xl overflow-hidden">
         <div className="h-full bg-emerald-600" style={{ width: `${hpBar}%` }} />
       </div>
-      <div className={`mt-3 grid gap-1 text-sm text-neutral-300 ${right ? "md:justify-items-end" : ""}`}>
+      <div className={`mt-2 sm:mt-3 grid gap-1 text-xs sm:text-sm text-neutral-300 ${right ? "md:justify-items-end" : ""}`}>
         <div><span className="text-neutral-500">Last attack:</span> {lastAttack ?? "—"}</div>
         <div><span className="text-neutral-500">Last blocks:</span> {lastBlocks?.length ? lastBlocks.join(" + ") : "—"}</div>
       </div>
@@ -493,9 +493,9 @@ function FighterCard({ title, hp, hpMax, hpBar, lastAttack, lastBlocks, right }:
 function LevelPicker({ label, value, onChange }: { label: string; value: Level; onChange: (l: Level) => void }) {
   return (
     <div className="flex items-center gap-1">
-      <span className="text-neutral-400">{label}</span>
+      <span className="text-neutral-400 text-xs sm:text-sm">{label}</span>
       <select
-        className="bg-neutral-900 border border-neutral-700 rounded-xl px-2 py-1"
+        className="bg-neutral-900 border border-neutral-700 rounded-xl px-2 py-1 text-xs sm:text-sm"
         value={value}
         onChange={(e) => onChange(parseInt(e.target.value, 10) as Level)}
       >

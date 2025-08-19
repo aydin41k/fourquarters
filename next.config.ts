@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const isGitHubPages = process.env.GITHUB_ACTIONS === "true";
-const repositoryName = "four-quarters";
+const repositoryName = "fourquarters";
 
 const nextConfig: NextConfig = {
   output: "export",

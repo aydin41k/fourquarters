@@ -1,4 +1,4 @@
-name: Deploy Vite site to Pages
+name: Deploy Next.js static export to Pages
 on:
   push: { branches: [ main ] }
   workflow_dispatch:
@@ -13,8 +13,11 @@ jobs:
         with: { node-version: 20 }
       - run: npm ci
       - run: npm run build
+      - name: Verify static export exists
+        run: |
+          test -f out/index.html || (echo "out/index.html missing" && ls -la out || true && exit 1)
       - uses: actions/upload-pages-artifact@v3
-        with: { path: dist }
+        with: { path: out }
   deploy:
     needs: build
     runs-on: ubuntu-latest

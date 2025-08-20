@@ -81,6 +81,7 @@ declare global {
     const [viewport, setViewport] = useState<{ height: number; width: number; is_expanded: boolean }>({ height: 0, width: 0, is_expanded: false });
 
   useEffect(() => {
+    console.log('Component mounting, initializing...'); // Debug log
     if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
       const tg = window.Telegram.WebApp;
       
@@ -290,8 +291,9 @@ function ZoneBoard({ attack, blocks, onAttack, onToggleBlock, hitZone, blockedZo
 }){
   const Z: Record<Zone,string> = {
     Head: "M50 5 L65 20 L50 35 L35 20 Z",
-    Chest: "M35 40 L65 40 L70 60 L30 60 Z",
-    Torso: "M30 60 L70 60 L65 85 L35 85 Z",
+    // Add a small gap between Chest and Torso (Chest ends at y=58, Torso starts at y=62)
+    Chest: "M35 40 L65 40 L70 58 L30 58 Z",
+    Torso: "M30 62 L70 62 L65 85 L35 85 Z",
     Knees: "M38 95 L62 95 L62 110 L38 110 Z",
     Feet: "M35 120 L65 120 L60 135 L40 135 Z",
   };
@@ -321,9 +323,9 @@ function ZoneBoard({ attack, blocks, onAttack, onToggleBlock, hitZone, blockedZo
     <div className="relative flex items-center justify-center">
       <svg viewBox="0 0 100 140" className="w-full max-w-[120px] sm:max-w-xs mx-auto select-none">
         {zones.map(z => (
-          <g key={z} onClick={()=>handle(z)} data-zone={z}>
+          <g key={z} onClick={()=>handle(z)} data-zone={z} className="transition-transform active:scale-95">
             <path d={Z[z]}
-              className={["transition-all duration-150 cursor-pointer",
+              className={["transition-colors duration-150 cursor-pointer",
                 (hitZone===z) ? "fill-rose-600/50 stroke-rose-400" :
                 (blockedZone===z) ? "fill-sky-600/40 stroke-sky-400" :
                 (isBlock(z)) ? "fill-sky-500/20 stroke-sky-300" :
@@ -331,6 +333,8 @@ function ZoneBoard({ attack, blocks, onAttack, onToggleBlock, hitZone, blockedZo
               ].join(" ")}
               strokeWidth={1.5}
             />
+            {/* Invisible oversized hitbox to increase tap target */}
+            <path d={Z[z]} fill="transparent" stroke="black" strokeOpacity={0} strokeWidth={22} pointerEvents="stroke" />
             {isBlock(z) && (
               <text x="50" y={labelY(z)} textAnchor="middle" className="fill-sky-300 text-[8px] sm:text-[10px]">🛡</text>
             )}
@@ -343,12 +347,12 @@ function ZoneBoard({ attack, blocks, onAttack, onToggleBlock, hitZone, blockedZo
 }
 function labelY(z:Zone){ return ({Head:18, Chest:52, Torso:76, Knees:104, Feet:130} as Record<Zone, number>)[z]; }
 
-type Fx = { id:number; kind:"dmg"|"slash"|"parry"; xPct:number; yPct:number; text?:string; ttl:number };
+type Fx = { id:number; kind:"dmg"|"slash"|"parry"; xPct:number; yPct:number; text?:string; ttl:number; side?: 'you' | 'opponent' };
 function EffectsLayer({fx}:{fx:Fx[]}){
   return (
     <div className="pointer-events-none absolute inset-0">
       {fx.map(f => f.kind==="dmg" ? (
-        <div key={f.id} style={{left:`${f.xPct}%`, top:`${f.yPct}%`, transform:"translate(-50%,-50%)"}} className="absolute animate-[float_.8s_ease-out_forwards] text-rose-300 font-bold drop-shadow">{f.text}</div>
+        <div key={f.id} style={{left:`${f.xPct}%`, top:`${f.yPct}%`, transform:"translate(-50%,-50%)"}} className="absolute animate-[float_1.2s_ease-out_forwards] text-rose-300 font-extrabold drop-shadow text-lg md:text-2xl">{f.text}</div>
       ) : f.kind==="slash" ? (
         <div key={f.id} style={{left:`${f.xPct}%`, top:`${f.yPct}%`, transform:"translate(-50%,-50%) rotate(45deg)"}} className="absolute w-16 h-0.5 bg-rose-300/80 animate-[slash_.35s_ease-out_forwards]" />
       ) : (
@@ -359,7 +363,7 @@ function EffectsLayer({fx}:{fx:Fx[]}){
 }
 
 const FX_CSS = `
-  @keyframes float { 0%{transform:translate(-50%,-50%) translateY(0);opacity:1} 100%{transform:translate(-50%,-50%) translateY(-24px);opacity:0} }
+  @keyframes float { 0%{transform:translate(-50%,-50%) translateY(0);opacity:1} 100%{transform:translate(-50%,-50%) translateY(-28px);opacity:0} }
   @keyframes slash { 0%{opacity:.9} 100%{opacity:0; transform:translate(-50%,-50%) rotate(45deg) translate(24px,-24px)} }
   @keyframes parry { 0%{transform:translate(-50%,-50%) scale(.4); opacity:.9} 100%{transform:translate(-50%,-50%) scale(1.6); opacity:0} }
   @keyframes shake { 0%{transform:translateX(0)} 25%{transform:translateX(2px)} 50%{transform:translateX(-2px)} 75%{transform:translateX(1px)} 100%{transform:translateX(0)} }
@@ -372,11 +376,24 @@ export default function BattlePrototype() {
   const { isReady, user, theme, viewport, haptic, mainButton, backButton } = useTelegramSDK();
   const colours = getThemeColours(theme);
   
+  // FX timing constants
+  const FX_TTL = {
+    dmg: 2000,
+    slash: 400,
+    parry: 300,
+  } as const;
+  
   const [p1, setP1] = useState<Fighter>(() => makeFighter(user?.first_name || "You", 1));
   const [bot, setBot] = useState<Fighter>(() => makeFighter("Bot", 1));
 
   const [choicesP1, setChoicesP1] = useState<TurnChoices>({ attack: null, blocks: [] });
   const [round, setRound] = useState(1);
+  
+  // Debug log when round changes
+  useEffect(() => {
+    console.log('Round state changed to:', round);
+  }, [round]);
+  
   const [log, setLog] = useState<string[]>(["Battle started. Make your choices and click Resolve Turn."]);
   const [isOver, setIsOver] = useState(false);
   const [finalRewards, setFinalRewards] = useState<{you:number; bot:number} | null>(null);
@@ -394,6 +411,21 @@ export default function BattlePrototype() {
   // Removed unused noop function
   const [showBotBlocks, setShowBotBlocks] = useState(false);
   function spawnFx(f: Omit<Fx,"id">){ const id = fxId.current++; setFx(s=>[...s,{...f,id}]); setTimeout(()=> setFx(s=>s.filter(x=>x.id!==id)), f.ttl); }
+
+  // Refs to pulse/highlight boards when pressing "Change"
+  const playerBoardRef = useRef<HTMLDivElement>(null);
+  const opponentBoardRef = useRef<HTMLDivElement>(null);
+
+  const pulseEl = (el: HTMLElement | null) => {
+    if (!el) return;
+    el.classList.add('ring-2','ring-emerald-500');
+    el.style.animation = 'pulse 0.6s ease-in-out';
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => {
+      el.classList.remove('ring-2','ring-emerald-500');
+      el.style.animation = '';
+    }, 700);
+  };
 
   // Telegram haptic feedback for game interactions
   const triggerHaptic = (type: 'selection' | 'light' | 'medium' | 'heavy' | 'success' | 'error' | 'warning') => {
@@ -486,6 +518,7 @@ export default function BattlePrototype() {
   }
 
   function makeNew(p: Level, b: Level) {
+    console.log('makeNew called with levels:', p, b); // Debug log
     setP1(makeFighter(user?.first_name || "You", p));
     setBot(makeFighter("Bot", b));
     setRound(1);
@@ -574,10 +607,10 @@ export default function BattlePrototype() {
     }, 2200);
     const posPlayer = zoneCenterPct(choicesP1.attack!);
     const posBot = zoneCenterPct(botAttack);
-    spawnTelegramFx({ kind: pBlocked ? "parry" : "slash", xPct: posPlayer.xPct, yPct: posPlayer.yPct, ttl: pBlocked ? 250 : 350 });
-    if (!pBlocked && appliedToBot>0) spawnTelegramFx({ kind:"dmg", xPct: posPlayer.xPct, yPct: Math.max(0,posPlayer.yPct-6), text:`-${appliedToBot}`, ttl: 900 });
-    spawnTelegramFx({ kind: bBlocked ? "parry" : "slash", xPct: posBot.xPct, yPct: posBot.yPct, ttl: bBlocked ? 250 : 350 });
-    if (!bBlocked && appliedToP1>0) spawnTelegramFx({ kind:"dmg", xPct: posBot.xPct, yPct: Math.max(0,posBot.yPct-6), text:`-${appliedToBot}`, ttl: 900 });
+    spawnTelegramFx({ kind: pBlocked ? "parry" : "slash", xPct: posPlayer.xPct, yPct: posPlayer.yPct, ttl: pBlocked ? FX_TTL.parry : FX_TTL.slash, side: 'opponent' });
+    if (!pBlocked && appliedToBot>0) spawnTelegramFx({ kind:"dmg", xPct: posPlayer.xPct, yPct: Math.max(0,posPlayer.yPct-6), text:`-${appliedToBot}`, ttl: FX_TTL.dmg, side: 'opponent' });
+    spawnTelegramFx({ kind: bBlocked ? "parry" : "slash", xPct: posBot.xPct, yPct: posBot.yPct, ttl: bBlocked ? FX_TTL.parry : FX_TTL.slash, side: 'you' });
+    if (!bBlocked && appliedToP1>0) spawnTelegramFx({ kind:"dmg", xPct: posBot.xPct, yPct: Math.max(0,posBot.yPct-6), text:`-${appliedToP1}`, ttl: FX_TTL.dmg, side: 'you' });
     const card = document.getElementById("controlsCard");
     if (card){ card.classList.add("shake"); setTimeout(()=> card.classList.remove("shake"), 140); }
 
@@ -689,6 +722,7 @@ export default function BattlePrototype() {
   // Auto-load game state on mount
   useEffect(() => {
     if (isReady) {
+      console.log('Component ready, initial round state:', round); // Debug log
       loadGameState();
     }
   }, [isReady]);
@@ -754,17 +788,24 @@ export default function BattlePrototype() {
         const savedState = localStorage.getItem('fourQuartersGameState');
         if (savedState) {
           const gameState = JSON.parse(savedState);
+          console.log('Found saved game state:', gameState); // Debug log
           // Only restore if saved within last hour
           if (Date.now() - gameState.timestamp < 3600000) {
+            console.log('Restoring game state with round:', gameState.round); // Debug log
             setP1(prev => ({ ...prev, level: gameState.p1.level, hp: gameState.p1.hp, dealt: gameState.p1.dealt }));
             setBot(prev => ({ ...prev, level: gameState.bot.level, hp: gameState.bot.hp, dealt: gameState.bot.dealt }));
             setRound(gameState.round);
             setChoicesP1(gameState.choices);
             showTelegramNotification('Game state restored!', 'success');
             return true;
+          } else {
+            console.log('Saved game state is too old, not restoring'); // Debug log
           }
+        } else {
+          console.log('No saved game state found'); // Debug log
         }
       } catch (error) {
+        console.error('Error loading game state:', error); // Debug log
         showTelegramNotification('Failed to restore game state', 'error');
       }
     }
@@ -805,9 +846,9 @@ export default function BattlePrototype() {
         <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <div className="flex flex-col gap-1">
             <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
-              {isReady && user ? `${user.first_name}'s Battleground` : "FOUR QUARTERS · Battleground"}
+              {isReady && user ? `${user.first_name}'s Battleground` : "QUARTER FOUR · Battleground"}
             </h1>
-            {isReady && (
+            {isReady && 1 != 1 && (
               <div className={`text-xs ${colours.textSecondary} flex items-center gap-2`}>
                 {user ? (
                   <>
@@ -843,76 +884,82 @@ export default function BattlePrototype() {
           <div id="controlsCard" className={`rounded-3xl ${colours.card} p-3 sm:p-4 relative overflow-hidden`}>
             <h2 className="text-lg font-semibold mb-3">Your turn · Round {round}</h2>
             <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-4">
-              <div className="relative">
+              <div className="relative" ref={playerBoardRef}>
                 <div className="text-xs text-neutral-400 mb-1">You</div>
                 <ZoneBoard attack={null} blocks={choicesP1.blocks}
                   mode="blocks"
                   onToggleBlock={(z)=> toggleBlock(z, choicesP1, setChoicesP1)}
                   hitZone={lastHitZone} blockedZone={lastBlockedZone} />
-                <EffectsLayer fx={fx} />
+                {(p1.level === 1 && round === 1 && !choicesP1.attack && choicesP1.blocks.length === 0) && (
+                  <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 top-1">
+                    <div className="px-3 py-1 rounded-full text-[11px] bg-neutral-900/85 border border-neutral-700 animate-[pulse_1.2s_ease-in-out_infinite]">
+                      Block 2 areas
+                    </div>
+                  </div>
+                )}
+                <EffectsLayer fx={fx.filter(f => f.side === 'you')} />
               </div>
-              <div className="relative">
+              <div className="relative" ref={opponentBoardRef}>
                 <div className="text-xs text-neutral-400 mb-1 text-right">Opponent</div>
                 <ZoneBoard attack={choicesP1.attack} blocks={showBotBlocks ? (bot.lastBlocks ?? []) : []}
                   mode="attack"
                   onAttack={(z)=> setChoicesP1(c=>({...c, attack: z}))}
                   hitZone={lastBotHitZone}
                   blockedZone={lastBotBlockedZone} />
+                {(p1.level === 1 && round === 1 && !choicesP1.attack && choicesP1.blocks.length === 0) && (
+                  <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 top-1">
+                    <div className="px-3 py-1 rounded-full text-[11px] bg-neutral-900/85 border border-neutral-700 animate-[pulse_1.2s_ease-in-out_infinite]">
+                      Hit 1
+                    </div>
+                  </div>
+                )}
+                <EffectsLayer fx={fx.filter(f => f.side === 'opponent')} />
               </div>
             </div>
-            <div className={`text-xs ${colours.textSecondary} mt-2`}>Tip: Click the <span className={colours.text}>opponent</span> to choose your <span className={colours.text}>attack</span>, and click your <span className={colours.text}>body</span> to toggle up to two <span className={colours.text}>blocks</span>.</div>
-            {/* Buttons (redundant controls) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mt-3">
-              {/* LEFT: Block (pick 2) */}
-              <div>
-                <h3 className="text-sm uppercase tracking-wider text-neutral-400 mb-2">Block (pick 2)</h3>
-                <div className="flex flex-wrap gap-1 sm:gap-2">
-                  {ZONES.map((z) => {
-                    const selected = choicesP1.blocks.includes(z);
-                    const disabled = !selected && choicesP1.blocks.length >= 2;
-                    return (
-                      <button
-                        key={z}
-                        onClick={() => toggleBlock(z, choicesP1, setChoicesP1)}
-                        disabled={disabled}
-                        className={
-                          "px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl border text-xs sm:text-sm " +
-                          (selected
-                            ? "bg-sky-600 border-sky-500"
-                            : disabled
-                              ? "bg-neutral-900 border-neutral-800 opacity-60 cursor-not-allowed"
-                              : "bg-neutral-800 border-neutral-700 hover:bg-neutral-700")
-                        }
-                      >{z}</button>
-                    );
-                  })}
-                </div>
-              </div>
-              {/* RIGHT: Attack */}
-              <div>
-                <h3 className="text-sm uppercase tracking-wider text-neutral-400 mb-2">Attack</h3>
-                <div className="flex flex-wrap gap-1 sm:gap-2">
-                  {ZONES.map((z) => (
+            <div className={`text-xs ${colours.textSecondary} mt-2`}>Tip: Tap the <span className={colours.text}>opponent</span> to choose your <span className={colours.text}>attack</span>, and tap your <span className={colours.text}>body</span> to toggle up to two <span className={colours.text}>blocks</span>.</div>
+
+            {/* Sticky helper bar with summary and Change chips */}
+            {(() => {
+              const blocksLeft = 2 - choicesP1.blocks.length;
+              return (
+                <div className={`sticky top-0 z-10 -mx-3 sm:-mx-4 mt-3 mb-2 px-3 sm:px-4 py-2 ${theme === 'light' ? 'bg-white' : 'bg-neutral-900'} border-y border-neutral-800/50 flex items-center justify-between`}>
+                  <div className="text-xs sm:text-sm flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span>You will block:</span>
+                    <span className="font-medium">{choicesP1.blocks.length ? choicesP1.blocks.join(', ') : '—'}</span>
                     <button
-                      key={z}
-                      onClick={() => setChoicesP1((c) => ({ ...c, attack: c.attack === z ? null : z }))}
-                      className={
-                        "px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl border text-xs sm:text-sm " +
-                        (choicesP1.attack === z
-                          ? "bg-emerald-600 border-emerald-500"
-                          : "bg-neutral-800 border-neutral-700 hover:bg-neutral-700")
-                      }
-                    >{z}</button>
-                  ))}
+                      onClick={() => { haptic.selection(); pulseEl(playerBoardRef.current); }}
+                      className="text-[10px] px-2 py-0.5 rounded-full border border-neutral-600 hover:bg-neutral-800"
+                    >
+                      Change
+                    </button>
+                    <span className="text-neutral-500">•</span>
+                    <span>You will attack:</span>
+                    <span className="font-medium">{choicesP1.attack ?? '—'}</span>
+                    <button
+                      onClick={() => { haptic.selection(); pulseEl(opponentBoardRef.current); }}
+                      className="text-[10px] px-2 py-0.5 rounded-full border border-neutral-600 hover:bg-neutral-800"
+                    >
+                      Change
+                    </button>
+                  </div>
+                  {blocksLeft > 0 && (
+                    <div className="text-[11px] text-amber-400">
+                      {blocksLeft} blocks left
+                    </div>
+                  )}
                 </div>
-              </div>
-            </div>
-            <div className="mt-4 flex flex-col sm:flex-row items-center gap-2">
+              );
+            })()}
+
+            {/* CTA row (single set) */}
+            <div className="mt-2 flex flex-col items-center gap-2">
               <button
                 onClick={() => handleButtonClick(resolveTurn, 'medium')}
-                disabled={isOver}
-                className={`w-full sm:w-auto rounded-2xl px-4 py-2 ${colours.accent} ${colours.accentHover} disabled:opacity-60`}
-              >Make your move 👊</button>
+                disabled={isOver || !(choicesP1.attack && choicesP1.blocks.length === 2)}
+                className={`w-full rounded-2xl px-4 py-2 ${colours.accent} ${colours.accentHover} disabled:opacity-60 disabled:cursor-not-allowed`}
+              >
+                Make your move 👊
+              </button>
               <button
                 onClick={() => handleButtonClick(() => {
                 setChoicesP1({ attack: null, blocks: [] });
@@ -922,7 +969,7 @@ export default function BattlePrototype() {
                 setBot(prev=>({...prev, lastBlocks: []}));
               }, 'light')}
                 disabled={isOver}
-                className={`w-full sm:w-auto rounded-2xl px-3 py-2 ${colours.neutral} ${colours.neutralHover}`}
+                className={`w-full rounded-2xl px-3 py-2 ${colours.neutral} ${colours.neutralHover}`}
               >Reset</button>
             </div>
           </div>
@@ -1033,9 +1080,17 @@ function hpBarPercent(hp: number, hpMax: number) {
   return Math.round((hp / hpMax) * 100);
 }
 
+function getHealthBarColor(hpPercent: number): string {
+  if (hpPercent < 25) return 'bg-red-500'; // Red when below 25%
+  if (hpPercent < 75) return 'bg-amber-500'; // Amber when below 75%
+  return 'bg-emerald-600'; // Green when 75% or above
+}
+
 function FighterCard({ title, hp, hpMax, hpBar, lastAttack, lastBlocks, right }: { title: string; hp: number; hpMax: number; hpBar: number; lastAttack?: Zone; lastBlocks?: Zone[]; right?: boolean }) {
   const { theme } = useTelegramSDK();
   const colours = getThemeColours(theme);
+  
+  const healthBarColor = getHealthBarColor(hpBar);
   
   return (
     <div className={`rounded-3xl ${colours.card} p-3 sm:p-4 ${right ? "md:text-right" : ""}`}>
@@ -1044,7 +1099,7 @@ function FighterCard({ title, hp, hpMax, hpBar, lastAttack, lastBlocks, right }:
         <span className={`text-xs sm:text-sm ${colours.textSecondary}`}>HP {hp}/{hpMax}</span>
       </div>
       <div className="h-2 sm:h-3 bg-neutral-800 rounded-xl overflow-hidden">
-        <div className="h-full bg-emerald-600" style={{ width: `${hpBar}%` }} />
+        <div className={`h-full ${healthBarColor}`} style={{ width: `${hpBar}%` }} />
       </div>
       <div className={`mt-2 sm:mt-3 grid gap-1 text-xs sm:text-sm ${colours.textSecondary} ${right ? "md:justify-items-end" : ""}`}>
         <div><span className="text-neutral-500">Last attack:</span> {lastAttack ?? "—"}</div>
